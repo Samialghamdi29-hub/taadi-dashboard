@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة رصد التعديات</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--navy:#1A0A35;--blue:#2D1463;--accent:#14B8A6;--accent2:#2DD4BF;--gold:#8B5CF6;--green:#10B981;--red:#EF4444;--surface:#1E0D40;--surface2:#2A1558;--border:rgba(20,184,166,0.25);--text:#F0EDF8;--muted:#A78BCA;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Tajawal',sans-serif;background:var(--navy);color:var(--text);direction:rtl;}
+.header{background:linear-gradient(135deg,#1A0A35,#2D1463,#0D4F4A);border-bottom:2px solid #14B8A6;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.logo{width:44px;height:44px;background:linear-gradient(135deg,#14B8A6,#6B3FB5);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.h-title h1{font-size:17px;font-weight:800;background:linear-gradient(90deg,#fff,#2DD4BF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.h-title p{font-size:10px;color:var(--muted);}
+.header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.badge{background:rgba(14,165,233,0.15);border:1px solid var(--border);border-radius:16px;padding:4px 10px;font-size:11px;color:#2DD4BF;}
+#saveInd{font-size:11px;color:#14B8A6;opacity:0;transition:opacity 0.5s;}
+.save-btn{background:linear-gradient(135deg,#14B8A6,#0D9488);border:none;border-radius:8px;padding:7px 14px;color:#fff;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 0 12px rgba(16,185,129,0.3);}
+.save-btn:hover{opacity:0.85;}
+.import-btn{background:linear-gradient(135deg,#6B3FB5,#4A2C8A);border:none;border-radius:8px;padding:7px 14px;color:#fff;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+.import-btn:hover{opacity:0.85;}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);}
+@media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr);}}
+.stat{background:linear-gradient(135deg,var(--surface2),rgba(26,61,107,0.5));border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:10px;}
+.si{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.si-b{background:rgba(14,165,233,0.2)}.si-g{background:rgba(245,158,11,0.2)}.si-gr{background:rgba(16,185,129,0.2)}
+.sn{font-size:24px;font-weight:800;line-height:1;}
+.sn-b{color:#14B8A6}.sn-g{color:#8B5CF6}.sn-gr{color:#2DD4BF}
+.sl{font-size:10px;color:var(--muted);margin-top:2px;}
+.main{padding:16px 24px;display:flex;flex-direction:column;gap:16px;}
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.card-header{padding:11px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(11,31,58,0.5);flex-wrap:wrap;gap:6px;}
+.card-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;}
+#map{height:420px;}
+.map-legend{padding:8px 16px;display:flex;gap:14px;align-items:center;border-top:1px solid var(--border);font-size:11px;flex-wrap:wrap;}
+.li{display:flex;align-items:center;gap:5px;}
+.ld{width:10px;height:10px;border-radius:50%;}
+.ll{width:20px;height:3px;border-radius:2px;}
+.filter-bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+.fb{background:rgba(14,165,233,0.1);border:1px solid var(--border);border-radius:14px;padding:3px 11px;font-size:11px;color:var(--text);cursor:pointer;font-family:'Tajawal',sans-serif;}
+.fb:hover,.fb.active{background:#14B8A6;border-color:#14B8A6;color:#fff;}
+.tw{overflow:auto;max-height:460px;}
+.tw::-webkit-scrollbar{width:4px;height:4px;}
+.tw::-webkit-scrollbar-thumb{background:#14B8A6;border-radius:3px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead{position:sticky;top:0;z-index:5;}
+thead th{background:#1A0A35;padding:9px 11px;font-weight:700;font-size:11px;color:#2DD4BF;text-align:right;white-space:nowrap;border-bottom:2px solid #14B8A6;}
+tbody tr{border-bottom:1px solid rgba(14,165,233,0.07);cursor:pointer;}
+tbody tr:nth-child(even){background:rgba(14,165,233,0.04);}
+tbody tr:hover{background:rgba(14,165,166,0.12);}
+tbody tr.hl{background:rgba(14,184,166,0.2)!important;}
+tbody td{padding:7px 11px;color:var(--text);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+td.num{color:var(--muted);font-size:11px;text-align:center;width:32px;}
+.sb{display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:700;}
+.s-قائم{background:rgba(245,158,11,0.2);color:#FCD34D;border:1px solid rgba(245,158,11,0.3);}
+.s-مزال{background:rgba(239,68,68,0.2);color:#FCA5A5;border:1px solid rgba(239,68,68,0.3);}
+.s-اجراء{background:rgba(14,165,233,0.2);color:#7DD3FC;border:1px solid rgba(14,165,233,0.3);}
+.s-رصد{background:rgba(168,85,247,0.2);color:#D8B4FE;border:1px solid rgba(168,85,247,0.3);}
+.mb{background:rgba(14,165,233,0.12);border:1px solid var(--border);border-radius:5px;padding:2px 7px;cursor:pointer;color:#2DD4BF;font-size:11px;font-family:'Tajawal',sans-serif;}
+.mb:hover{background:#14B8A6;color:#fff;}
+.db{background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);border-radius:5px;padding:2px 6px;cursor:pointer;color:#FCA5A5;font-size:11px;font-family:'Tajawal',sans-serif;}
+.nc{color:var(--muted);font-size:10px;}
+.sb-box{background:rgba(14,165,233,0.08);border:1px solid var(--border);border-radius:14px;padding:3px 12px;font-size:11px;color:var(--text);font-family:'Tajawal',sans-serif;outline:none;width:170px;}
+.sb-box:focus{border-color:#14B8A6;}
+.rc{font-size:11px;color:var(--muted);}
+.rc strong{color:#14B8A6;}
+.ec{cursor:pointer;border-radius:4px;padding:1px 2px;}
+.ec:hover{background:rgba(20,184,166,0.15);}
+.ec input,.ec select{background:#1A0A35;color:#F0EDF8;border:1px solid #14B8A6;border-radius:4px;padding:2px 6px;font-family:'Tajawal',sans-serif;font-size:11px;direction:rtl;outline:none;width:100%;min-width:75px;}
+.leaflet-popup-content-wrapper{background:#1A0A35!important;border:1px solid rgba(14,165,233,0.5)!important;border-radius:12px!important;direction:rtl;}
+.leaflet-popup-tip{background:#1A0A35!important;}
+.leaflet-popup-content{margin:0!important;padding:0!important;}
+.pc{padding:13px;min-width:220px;font-family:'Tajawal',sans-serif;}
+.pn{font-size:10px;color:#7BA7CC;margin-bottom:3px;}
+.pt{font-size:13px;font-weight:700;color:#E2EEF9;margin-bottom:8px;line-height:1.4;}
+.pr{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:11px;color:#7BA7CC;}
+.pr strong{color:#E2EEF9;}
+.pi{width:100%;height:120px;object-fit:cover;border-radius:7px;margin-top:8px;display:block;}
+.pip{width:100%;height:80px;border-radius:7px;margin-top:8px;background:rgba(20,184,166,0.07);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1.5px dashed rgba(20,184,166,0.3);cursor:pointer;}
+.pip:hover{background:rgba(20,184,166,0.14);}
+.pip span{font-size:18px;}.pip p{font-size:10px;color:#7BA7CC;}
+.piw{position:relative;margin-top:8px;}
+.piw img{width:100%;height:120px;object-fit:cover;border-radius:7px;}
+.pid{position:absolute;top:4px;left:4px;background:rgba(239,68,68,0.85);border:none;border-radius:50%;width:19px;height:19px;color:#fff;font-size:10px;cursor:pointer;}
+.pub{margin-top:6px;width:100%;background:rgba(20,184,166,0.1);border:1px solid rgba(20,184,166,0.3);border-radius:5px;padding:4px;color:#2DD4BF;font-size:11px;font-family:'Tajawal',sans-serif;cursor:pointer;}
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal{background:#1A0A35;border:1px solid var(--border);border-radius:16px;padding:24px;max-width:520px;width:100%;direction:rtl;}
+.modal h2{font-size:16px;font-weight:800;color:#2DD4BF;margin-bottom:12px;}
+.modal p{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+.drop-zone{border:2px dashed rgba(20,184,166,0.4);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:background 0.2s;}
+.drop-zone:hover,.drop-zone.dragover{background:rgba(20,184,166,0.08);border-color:#14B8A6;}
+.drop-zone p{font-size:13px;color:var(--muted);}
+.drop-zone .icon{font-size:36px;margin-bottom:8px;}
+.add-row-btn{background:linear-gradient(135deg,#10B981,#059669);border:none;border-radius:8px;padding:6px 13px;color:#fff;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<!-- Import Modal -->
+<div id="importModal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <h2>📥 استيراد بيانات من Excel</h2>
+    <p>اسحب ملف Excel هنا أو اضغط للاختيار. يجب أن يحتوي الملف على أعمدة:<br>
+    <strong style="color:#2DD4BF">رقم، رقم المعاملة، وصف التعدي، تاريخ الرصد، خط الطول E، خط العرض N، الحي، الشارع، نوع الشبكة، مصدر التعدي، عدد مرات الرصد، الحالة، البلدية</strong></p>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('xlsxInput').click()">
+      <div class="icon">📂</div>
+      <p>اسحب ملف .xlsx أو .xls هنا<br><span style="color:#14B8A6;font-size:11px">أو اضغط للاختيار</span></p>
+    </div>
+    <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none" onchange="handleXlsxImport(this)">
+    <div id="importStatus" style="margin-top:10px;font-size:12px;color:#14B8A6;min-height:18px;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="save-btn" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.3);box-shadow:none;" onclick="document.getElementById('importModal').style.display='none'">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-right">
+    <div class="logo">🗺️</div>
+    <div class="h-title">
+      <h1>لوحة رصد التعديات</h1>
+      <p>البلد · الجامعة · أم السلم — شركة الخريف لتقنية المياه والطاقة</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <div class="badge">📅 <span id="badgeDate">2026</span></div>
+    <div class="badge">🏙️ أمانة جدة</div>
+    <span id="saveInd">✓ حُفظ</span>
+    <button class="import-btn" onclick="document.getElementById('importModal').style.display='flex'">📥 استيراد Excel</button>
+    <button class="add-row-btn" onclick="addNewRow()">➕ إضافة تعدٍ</button>
+    <button class="save-btn" onclick="saveAll()">💾 تصدير Excel</button>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="si si-b">📋</div><div><div class="sn sn-b" id="totalCount">0</div><div class="sl">إجمالي التعديات</div></div></div>
+  <div class="stat"><div class="si si-g">⚠️</div><div><div class="sn sn-g" id="activeCount">0</div><div class="sl">قائمة</div></div></div>
+  <div class="stat"><div class="si si-b">📍</div><div><div class="sn sn-b" id="coordCount">0</div><div class="sl">بإحداثيات</div></div></div>
+  <div class="stat"><div class="si si-gr">🏘️</div><div><div class="sn sn-gr" id="hoodCount">0</div><div class="sl">أحياء</div></div></div>
+</div>
+
+<div class="main">
+  <!-- Status counters -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+    <div onclick="filterByStatus('qaem')" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.35);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onmouseenter="this.style.opacity='0.8'" onmouseleave="this.style.opacity='1'">
+      <div><div style="font-size:11px;color:#D8B4FE;margin-bottom:3px">🟣 قائم أثناء الرصد</div><div style="font-size:28px;font-weight:800;color:#D8B4FE" id="cnt-qaem">0</div></div>
+      <div style="font-size:36px;opacity:0.3">📍</div>
+    </div>
+    <div onclick="filterByStatus('mazal')" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onmouseenter="this.style.opacity='0.8'" onmouseleave="this.style.opacity='1'">
+      <div><div style="font-size:11px;color:#FCA5A5;margin-bottom:3px">🔴 مزال</div><div style="font-size:28px;font-weight:800;color:#FCA5A5" id="cnt-mazal">0</div></div>
+      <div style="font-size:36px;opacity:0.3">✅</div>
+    </div>
+    <div onclick="filterByStatus('ijraa')" style="background:rgba(14,165,233,0.15);border:1px solid rgba(14,165,233,0.35);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onmouseenter="this.style.opacity='0.8'" onmouseleave="this.style.opacity='1'">
+      <div><div style="font-size:11px;color:#7DD3FC;margin-bottom:3px">🔵 تحت الإجراء</div><div style="font-size:28px;font-weight:800;color:#7DD3FC" id="cnt-ijraa">0</div></div>
+      <div style="font-size:36px;opacity:0.3">⚙️</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span>🗺️</span><span>خريطة مواقع التعديات</span></div>
+      <div class="filter-bar">
+        <span style="font-size:11px;color:var(--muted)">تصفية:</span>
+        <button class="fb active" onclick="filterMap(this,'all')">الكل</button>
+        <button class="fb" onclick="filterMap(this,'ابرغ الرغامة')">أبرق الرغامة</button>
+        <button class="fb" onclick="filterMap(this,'مريخ')">مريخ</button>
+        <button class="fb" onclick="filterMap(this,'الواحة')">الواحة</button>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="map-legend">
+      <div class="li"><div class="ld" style="background:#EF4444"></div><span>سطحية</span></div>
+      <div class="li"><div class="ld" style="background:#3B82F6"></div><span>أمطار</span></div>
+      <div class="li"><div class="ld" style="background:#94A3B8"></div><span>غير محدد</span></div>
+      <div class="li" style="margin-right:6px"><div class="ll" style="background:#EF4444"></div><span>شبكة سطحية</span></div>
+      <div class="li"><div class="ll" style="background:#3B82F6"></div><span>شبكة أمطار</span></div>
+      <div style="margin-right:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="color:var(--muted);font-size:10px">طبقات:</span>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer"><input type="checkbox" id="chkSurface" checked onchange="toggleLayer('surface')"> <span style="color:#EF4444">شبكة سطحية</span></label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer"><input type="checkbox" id="chkRain" checked onchange="toggleLayer('rain')"> <span style="color:#3B82F6">شبكة أمطار</span></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span>📑</span><span>جدول التعديات — اضغط أي خلية للتعديل</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="rc">عرض <strong id="rowCount">0</strong> سجل</span>
+        <input class="sb-box" type="text" placeholder="🔍 بحث..." oninput="searchTable(this.value)">
+      </div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th style="text-align:center">#</th>
+          <th>رقم المعاملة</th><th>وصف التعدي</th><th>تاريخ الرصد</th>
+          <th>الحي</th><th>الشارع</th><th>الإحداثيات</th>
+          <th>نوع الشبكة</th><th>مصدر التعدي</th><th>عدد مرات الرصد</th><th>الحالة</th>
+          <th>الموقع</th><th>البلدية</th><th></th>
+        </tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" style="display:none">
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const DEFAULT_DATA = [{"num":1,"ref":"430809","desc":"كسر خط فرعي تصريف مياه الامطار","date_obs":"2026-04-26","E":39.263562,"N":21.50853,"neighborhood":"ابرغ الرغامة","street":"عزف ابن عبد الرحمن","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":2,"ref":"4700146419","desc":"ضخ مياه","date_obs":"2026-04-26","E":39.269203,"N":21.500898,"neighborhood":"ابرغ الرغامة","street":"علي ابن غازي الحربي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":3,"ref":"رصد جديد","desc":"تسريب صرف صحي من مبني سكني علي شبكة السيول والامطار","date_obs":"2026-04-13","E":39.236306,"N":21.549806,"neighborhood":"الواحة","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":4,"ref":"رصد جديد","desc":"ضخ مياه صرف صحي من بيارة المبني السكني علي شبكة السيول عن طريق لي","date_obs":"2026-04-14","E":39.251183,"N":21.568361,"neighborhood":"الواحة","street":"النعمان بن عمرو","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":5,"ref":"رصد جديد","desc":"تسريب صرف صحي من بيارة مبني سكني علي شبكة السيول والامطار","date_obs":"2026-04-14","E":39.284105,"N":21.550448,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":6,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على شبكة المياة السطحية","date_obs":"2026-04-14","E":39.276112,"N":21.508181,"neighborhood":"ابرغ الرغامة","street":"خلف بن خليفة","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":7,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.2923432,"N":21.548883,"neighborhood":"مريخ","street":"زياد بن عبد الرحمن","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":8,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.2920344,"N":21.5494451,"neighborhood":"مريخ","street":"زياد بن عبد الرحمن","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":9,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.2917355,"N":21.54999391,"neighborhood":"مريخ","street":"زياد بن عبد الرحمن","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":10,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.2913493,"N":21.5507062,"neighborhood":"مريخ","street":"زياد بن عبد الرحمن","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":11,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.293781,"N":21.5492282,"neighborhood":"مريخ","street":"ابوسويد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":12,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.2941787,"N":21.550435,"neighborhood":"مريخ","street":"رافع بن سالم","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":13,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.2925391,"N":21.5531014,"neighborhood":"مريخ","street":"ابوسويد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":14,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.2919462,"N":21.5528232,"neighborhood":"مريخ","street":"ابوسويد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":15,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.2913909,"N":21.5525577,"neighborhood":"مريخ","street":"ابوسويد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":16,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-15","E":39.293781,"N":21.5492282,"neighborhood":"مريخ","street":"الواليد بن خالد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":17,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":18,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":19,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":20,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":21,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":22,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":23,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":24,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":25,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":26,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-16","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":27,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":28,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":29,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":30,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":31,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":32,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":33,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":34,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":35,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":36,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":37,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":38,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":39,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":40,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-17","E":null,"N":null,"neighborhood":"مريخ","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":41,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-18","E":39.301612,"N":21.490745,"neighborhood":"ابرغ الرغامة","street":"يونس وهبي أفندي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":42,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-18","E":39.301232,"N":21.490967,"neighborhood":"ابرغ الرغامة","street":"يونس وهبي أفندي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":43,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-18","E":39.301074,"N":21.491521,"neighborhood":"ابرغ الرغامة","street":"مسعود بن دهمش","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":44,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-18","E":39.300993,"N":21.492034,"neighborhood":"ابرغ الرغامة","street":"مسعود بن دهمش","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":45,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-18","E":39.276358,"N":21.508853,"neighborhood":"ابرغ الرغامة","street":"رؤيه بن عمرو","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":46,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-19","E":39.270248,"N":21.500611,"neighborhood":"ابرغ الرغامة","street":"علي بن أبي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":47,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-19","E":39.270248,"N":21.500611,"neighborhood":"ابرغ الرغامة","street":"علي بن أبي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":48,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-19","E":39.270406,"N":21.500031,"neighborhood":"ابرغ الرغامة","street":"عبدالغني ابن ابي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":49,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-19","E":39.270406,"N":21.500031,"neighborhood":"ابرغ الرغامة","street":"عبدالغني ابن ابي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":50,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-19","E":39.3900665,"N":21.489645,"neighborhood":"ابرغ الرغامة","street":"عبدالوهاب أشي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":51,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-19","E":39.299335,"N":21.491567,"neighborhood":"ابرغ الرغامة","street":"محمد بن ابي بكر السقاف","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":52,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-20","E":null,"N":null,"neighborhood":"الواحة","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":53,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-20","E":null,"N":null,"neighborhood":"الواحة","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":54,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-20","E":null,"N":null,"neighborhood":"ابرغ الرغامة","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":55,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-20","E":null,"N":null,"neighborhood":"ابرغ الرغامة","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":56,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-20","E":null,"N":null,"neighborhood":"ابرغ الرغامة","street":"_","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":57,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-23","E":39.300687,"N":21.490998,"neighborhood":"ابرغ الرغامة","street":"الرقي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":58,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-23","E":39.293786,"N":21.545939,"neighborhood":"مريخ","street":"يعقوب صبري","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":59,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-23","E":39.294098,"N":21.545375,"neighborhood":"مريخ","street":"يعقوب صبري","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":60,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-23","E":39.294407,"N":21.544808,"neighborhood":"مريخ","street":"يعقوب صبري","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":61,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-26","E":39.249722,"N":21.557778,"neighborhood":"الواحة","street":"عبدالله باسند","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":62,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.277641,"N":21.508049,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":63,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.277977,"N":21.507616,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":64,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.278518,"N":21.506967,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":65,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.278518,"N":21.506967,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":66,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.278518,"N":21.506967,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":67,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.278969,"N":21.505102,"neighborhood":"ابرغ الرغامة","street":"الوليد ابن عبد الملك","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":68,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.275964,"N":21.507847,"neighborhood":"ابرغ الرغامة","street":"خلف بن خليف","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":69,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.276878,"N":21.505207,"neighborhood":"ابرغ الرغامة","street":"عبدالله بن مسافع","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":70,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-28","E":39.276878,"N":21.505207,"neighborhood":"ابرغ الرغامة","street":"عبدالله بن مسافع","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":71,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-29","E":39.302027,"N":21.489484,"neighborhood":"ابرغ الرغامة","street":"احمد الدهان","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":72,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-29","E":39.300665,"N":21.489645,"neighborhood":"ابرغ الرغامة","street":"عبدالوهاب","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":73,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-29","E":39.301811,"N":21.491599,"neighborhood":"ابرغ الرغامة","street":"علي قرطبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":74,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-29","E":39.301811,"N":21.491599,"neighborhood":"ابرغ الرغامة","street":"علي قرطبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":75,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-29","E":39.295012,"N":21.538954,"neighborhood":"ابرغ الرغامة","street":"عبدالله ابن حارثة","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":76,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-29","E":39.301811,"N":21.491599,"neighborhood":"ابرغ الرغامة","street":"علي قرطبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":77,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-30","E":39.297146,"N":21.484989,"neighborhood":"ابرغ الرغامة","street":"إبراهيم الصولي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":78,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-30","E":39.296648,"N":21.485304,"neighborhood":"ابرغ الرغامة","street":"الشيخ عبدالله","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":79,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-30","E":39.346685,"N":21.55454,"neighborhood":"الواحة","street":"احمد ناضرين","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":80,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-30","E":39.247144,"N":21.553802,"neighborhood":"الواحة","street":"غزوة الابواء","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":81,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-04-30","E":39.294011,"N":21.551053,"neighborhood":"الواحة","street":"رافع بن سالم","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":82,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-02","E":39.275885,"N":21.504522,"neighborhood":"ابرغ الرغامة","street":"يحيى  البكري","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":83,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-02","E":39.27451,"N":21.506151,"neighborhood":"ابرغ الرغامة","street":"عبد الله بن مسافع","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":84,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-02","E":39.273236,"N":21.499307,"neighborhood":"ابرغ الرغامة","street":"احمد المستنير","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":85,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-02","E":null,"N":21.499719,"neighborhood":"ابرغ الرغامة","street":"إبراهيم بن باز","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":86,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-02","E":null,"N":21.499719,"neighborhood":"ابرغ الرغامة","street":"إبراهيم بن باز","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":87,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-02","E":39.27412,"N":21.499936,"neighborhood":"ابرغ الرغامة","street":"إبراهيم بن باز","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":88,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-02","E":39.272819,"N":21.499502,"neighborhood":"ابرغ الرغامة","street":"إبراهيم بن باز","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":89,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":39.271866,"N":21.499869,"neighborhood":"ابرغ الرغامة","street":"عبدالله ابن ابي حسان","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":90,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":39.27114,"N":21.500273,"neighborhood":"ابرغ الرغامة","street":"عبدالغني بن أبي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":91,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":39.272654,"N":21.501387,"neighborhood":"ابرغ الرغامة","street":"علي ين أبي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":92,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":39.272654,"N":21.501387,"neighborhood":"ابرغ الرغامة","street":"علي ين أبي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":93,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":39.271817,"N":21.501114,"neighborhood":"ابرغ الرغامة","street":"علي ين أبي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":94,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":39.271817,"N":21.501114,"neighborhood":"ابرغ الرغامة","street":"علي ين أبي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":95,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":null,"N":21.500846,"neighborhood":"ابرغ الرغامة","street":"علي ين أبي سعيد","type":"امطار","count":1,"source":"","status":"قائم","baladiya":""},{"num":96,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":39.282577,"N":21.49555,"neighborhood":"ابرغ الرغامة","street":"بدر التمام","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":97,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-03","E":39.267974,"N":21.49647,"neighborhood":"ابرغ الرغامة","street":"عثمان الكوفي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":98,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-05","E":39.391145,"N":21.549588,"neighborhood":"مريخ","street":"حصين بن حدير","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":99,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-05","E":39.288053,"N":21.545702,"neighborhood":"مريخ","street":"حي  ابن ثعلبة","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":100,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.275964,"N":21.507847,"neighborhood":"ابرغ الرغامة","street":"خلف بن خليف","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":101,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.278969,"N":21.505102,"neighborhood":"ابرغ الرغامة","street":"الوليد ابن عبد الملك","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":102,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.27932,"N":21.505801,"neighborhood":"ابرغ الرغامة","street":"الوليد ابن عبد الملك","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":103,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.276065,"N":21.506254,"neighborhood":"ابرغ الرغامة","street":"عمر بن ربيعة","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":104,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.27937,"N":21.507065,"neighborhood":"ابرغ الرغامة","street":"الوليد ابن عبد الملك","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":105,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.276386,"N":21.50567,"neighborhood":"ابرغ الرغامة","street":"عبدالله المسافع","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":106,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.276878,"N":21.505207,"neighborhood":"ابرغ الرغامة","street":"عبد الله بن مسافع","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":107,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.278974,"N":21.507553,"neighborhood":"ابرغ الرغامة","street":"الوليد ابن عبد الملك","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":108,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.276791,"N":21.507802,"neighborhood":"ابرغ الرغامة","street":"عمر بن ربيعة","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":109,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.276993,"N":21.508306,"neighborhood":"ابرغ الرغامة","street":"عبد الله بن مسافع","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":110,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.277641,"N":21.508049,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":111,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.277641,"N":21.508049,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":112,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.277604,"N":21.507567,"neighborhood":"ابرغ الرغامة","street":"ابن ابي الصديق","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":113,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.277325,"N":21.506919,"neighborhood":"ابرغ الرغامة","street":"ابن ابي الصديق","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":114,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.277325,"N":21.506919,"neighborhood":"ابرغ الرغامة","street":"ابن ابي الصديق","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":115,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.277977,"N":21.507616,"neighborhood":"ابرغ الرغامة","street":"ابن ابي الصديق","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":116,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.278518,"N":21.506967,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":117,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.278518,"N":21.506967,"neighborhood":"ابرغ الرغامة","street":"صالح بن احمد الحلبي","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":118,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-09","E":39.277803,"N":21.505293,"neighborhood":"ابرغ الرغامة","street":"ام ظهران","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":119,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-13","E":39.261178,"N":21.506363,"neighborhood":"ابرغ الرغامة","street":"الرغامة","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":120,"ref":"رصد جديد","desc":"توصيل ماسورة غير نظامية على الشبكة","date_obs":"2026-05-13","E":39.261706,"N":21.505394,"neighborhood":"ابرغ الرغامة","street":"الرغامة","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":121,"ref":"رصد جديد","desc":"تسريب صرف صحي","date_obs":"2026-05-18","E":39.290852,"N":21.549896,"neighborhood":"مريخ","street":"حصين بن حدير","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":122,"ref":"رصد جديد","desc":"توصيل لي على الشبكة مياه الامطار","date_obs":"2026-05-20","E":39.2665785,"N":21.09316,"neighborhood":"ابرغ الرغامة","street":"عوف بن عبدالرحمن","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":123,"ref":"رصد جديد","desc":"تسريب صرف صحي","date_obs":"2026-05-20","E":39.293678,"N":21.538307,"neighborhood":"مريخ","street":"عبدالله بن حارثه","type":"امطار","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":124,"ref":"رصد جديد","desc":"تسريب من شاحنة محروقات","date_obs":"2026-05-24","E":39.234764,"N":21.553558,"neighborhood":"الواحة","street":"طريق الحرمين","type":"امطار","count":1,"source":"","status":"قائم اثناء الرصد","baladiya":"أم السلم"},{"num":125,"ref":"رصد جديد","desc":"ضخ مياه","date_obs":"2026-05-24","E":39.310368,"N":21.447353,"neighborhood":"غليل","street":"طريق مكة القديم","type":"قناة","count":1,"source":"","status":"قائم","baladiya":"الجامعة"},{"num":126,"ref":"رصد جديد","desc":"تسريب صرف صحي","date_obs":"2026-05-25","E":39.388775,"N":21.483734,"neighborhood":"الحرازات","street":"كعب بن عمرو","type":"قناة","count":1,"source":"","status":"قائم","baladiya":"أم السلم"},{"num":127,"ref":"رصد جديد","desc":"تسريب صرف صحي","date_obs":"2026-05-25","E":39.3711471,"N":21.479231,"neighborhood":"الحرازات","street":"كعب بن عمرو","type":"قناة","count":1,"source":"","status":"قائم","baladiya":"أم السلم"}];
+
+const NETWORK_LINES = [{"type":"سطحي","coords":[[39.27650839924588,21.50878341678723],[39.27620663214369,21.50892167323239]]},{"type":"سطحي","coords":[[39.27708593556537,21.50855828423505],[39.27650839924588,21.50878341678723]]},{"type":"سطحي","coords":[[39.27741688212712,21.50929841082601],[39.27708593556537,21.50855828423505]]},{"type":"سطحي","coords":[[39.27772177938969,21.50899870012991],[39.27741688212712,21.50929841082601]]},{"type":"سطحي","coords":[[39.27690092339576,21.50805411678975],[39.27668033512105,21.50754992672739]]},{"type":"سطحي","coords":[[39.27708593556537,21.50855828423505],[39.27690092339576,21.50805411678975]]},{"type":"سطحي","coords":[[39.27801695419083,21.50867024477095],[39.27772177938969,21.50899870012991]]},{"type":"سطحي","coords":[[39.27825728302206,21.50838965930944],[39.27801695419083,21.50867024477095]]},{"type":"سطحي","coords":[[39.27866970488092,21.50790815011195],[39.27825728302206,21.50838965930944]]},{"type":"سطحي","coords":[[39.27927829963058,21.50719746466615],[39.27866970488092,21.50790815011195]]},{"type":"سطحي","coords":[[39.27946092328219,21.50693354780972],[39.27927839784433,21.50719732536249]]},{"type":"سطحي","coords":[[39.27954607321937,21.50667636511331],[39.27946092328219,21.50693354780972]]},{"type":"سطحي","coords":[[39.27955437905282,21.50644339207368],[39.27954607321937,21.50667636511331]]},{"type":"سطحي","coords":[[39.27949940781954,21.50616072115579],[39.27955437905282,21.50644339207368]]},{"type":"سطحي","coords":[[39.27914114171785,21.5054417779444],[39.27949940781954,21.50616072115579]]},{"type":"سطحي","coords":[[39.27879759191097,21.50476128497841],[39.27914114171785,21.5054417779444]]},{"type":"سطحي","coords":[[39.27845163479989,21.50407686047889],[39.27879759191097,21.50476128497841]]}];
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let DATA = JSON.parse(localStorage.getItem('taadiData') || 'null') || JSON.parse(JSON.stringify(DEFAULT_DATA));
+let images = JSON.parse(localStorage.getItem('taadiImages') || '{}');
+let mapFilter = 'all';
+let statusFilter = null;
+let searchQ = '';
+let map, markersLayer, surfaceLayer, rainLayer;
+let currentImageRow = null;
+
+// ── PERSIST ───────────────────────────────────────────────────────────────────
+function persist() {
+  localStorage.setItem('taadiData', JSON.stringify(DATA));
+  localStorage.setItem('taadiImages', JSON.stringify(images));
+  const ind = document.getElementById('saveInd');
+  ind.style.opacity = '1';
+  setTimeout(() => ind.style.opacity = '0', 1500);
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const total = DATA.length;
+  const active = DATA.filter(r => r.status && r.status.includes('قائم')).length;
+  const withCoords = DATA.filter(r => r.E && r.N).length;
+  const hoods = new Set(DATA.map(r => r.neighborhood).filter(Boolean)).size;
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('activeCount').textContent = active;
+  document.getElementById('coordCount').textContent = withCoords;
+  document.getElementById('hoodCount').textContent = hoods;
+
+  const qaem = DATA.filter(r => r.status === 'قائم اثناء الرصد').length;
+  const mazal = DATA.filter(r => r.status === 'مزال').length;
+  const ijraa = DATA.filter(r => r.status === 'تحت الإجراء').length;
+  document.getElementById('cnt-qaem').textContent = qaem;
+  document.getElementById('cnt-mazal').textContent = mazal;
+  document.getElementById('cnt-ijraa').textContent = ijraa;
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────────
+function initMap() {
+  map = L.map('map', {zoomControl: true}).setView([21.51, 39.28], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19
+  }).addTo(map);
+  markersLayer = L.layerGroup().addTo(map);
+
+  surfaceLayer = L.layerGroup();
+  rainLayer = L.layerGroup();
+  NETWORK_LINES.forEach(l => {
+    const coords = l.coords.map(c => [c[1], c[0]]);
+    const color = l.type === 'سطحي' ? '#EF4444' : '#3B82F6';
+    const line = L.polyline(coords, {color, weight: 2.5, opacity: 0.7});
+    (l.type === 'سطحي' ? surfaceLayer : rainLayer).addLayer(line);
+  });
+  surfaceLayer.addTo(map);
+  rainLayer.addTo(map);
+  renderMarkers();
+}
+
+function markerColor(row) {
+  if (row.type === 'سطحي') return '#EF4444';
+  if (row.type === 'امطار') return '#3B82F6';
+  return '#94A3B8';
+}
+
+function renderMarkers() {
+  markersLayer.clearLayers();
+  DATA.forEach((row, idx) => {
+    if (!row.E || !row.N) return;
+    if (mapFilter !== 'all' && row.neighborhood !== mapFilter) return;
+    const color = markerColor(row);
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 6px ${color}88;"></div>`,
+      iconSize: [12, 12], iconAnchor: [6, 6]
+    });
+    const marker = L.marker([row.N, row.E], {icon});
+    marker.on('click', () => {
+      const img = images[row.num];
+      const imgHtml = img
+        ? `<div class="piw"><img src="${img}"><button class="pid" onclick="removeImg(${row.num})">✕</button></div>`
+        : `<div class="pip" onclick="openImgPicker(${row.num})"><span>📷</span><p>إضافة صورة</p></div>`;
+      marker.bindPopup(`
+        <div class="pc">
+          <div class="pn">تعدٍ #${row.num}</div>
+          <div class="pt">${row.desc}</div>
+          <div class="pr">📍 <strong>${row.neighborhood}</strong></div>
+          <div class="pr">🛣️ <strong>${row.street}</strong></div>
+          <div class="pr">📅 <strong>${row.date_obs}</strong></div>
+          <div class="pr">🔧 <strong>${row.type}</strong></div>
+          <div class="pr">حالة: <strong>${row.status}</strong></div>
+          ${imgHtml}
+        </div>`).openPopup();
+      highlightRow(row.num);
+    });
+    markersLayer.addLayer(marker);
+  });
+}
+
+function filterMap(btn, val) {
+  document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  mapFilter = val;
+  renderMarkers();
+}
+
+function toggleLayer(type) {
+  if (type === 'surface') {
+    document.getElementById('chkSurface').checked ? surfaceLayer.addTo(map) : map.removeLayer(surfaceLayer);
+  } else {
+    document.getElementById('chkRain').checked ? rainLayer.addTo(map) : map.removeLayer(rainLayer);
+  }
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────────────
+const STATUS_OPTS = ['قائم','مزال','تحت الإجراء','قائم اثناء الرصد'];
+const TYPE_OPTS = ['امطار','سطحي','قناة','غير محدد'];
+
+function statusClass(s) {
+  if (!s) return '';
+  if (s.includes('مزال')) return 's-مزال';
+  if (s.includes('الإجراء')) return 's-اجراء';
+  if (s.includes('اثناء')) return 's-رصد';
+  return 's-قائم';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  let rows = DATA;
+  if (statusFilter) {
+    if (statusFilter === 'qaem') rows = rows.filter(r => r.status === 'قائم اثناء الرصد');
+    else if (statusFilter === 'mazal') rows = rows.filter(r => r.status === 'مزال');
+    else if (statusFilter === 'ijraa') rows = rows.filter(r => r.status === 'تحت الإجراء');
+  }
+  if (searchQ) {
+    const q = searchQ.toLowerCase();
+    rows = rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
+  }
+  document.getElementById('rowCount').textContent = rows.length;
+  tbody.innerHTML = rows.map((row, i) => {
+    const coords = (row.E && row.N) ? `${row.N.toFixed(5)}, ${row.E.toFixed(5)}` : '<span class="nc">—</span>';
+    const mapLink = (row.E && row.N) ? `<a href="https://maps.google.com/?q=${row.N},${row.E}" target="_blank" style="color:#2DD4BF;font-size:11px">🗺️</a>` : '';
+    return `<tr id="row-${row.num}" onclick="rowClick(${row.num})">
+      <td class="num">${row.num}</td>
+      <td class="ec" onclick="startEdit(event,${row.num},'ref')">${row.ref||''}</td>
+      <td class="ec" onclick="startEdit(event,${row.num},'desc')" style="max-width:180px">${row.desc||''}</td>
+      <td class="ec" onclick="startEdit(event,${row.num},'date_obs')">${row.date_obs||''}</td>
+      <td class="ec" onclick="startEdit(event,${row.num},'neighborhood')">${row.neighborhood||''}</td>
+      <td class="ec" onclick="startEdit(event,${row.num},'street')">${row.street||''}</td>
+      <td style="font-size:10px;color:var(--muted)">${coords}</td>
+      <td class="ec" onclick="startEditSel(event,${row.num},'type',${JSON.stringify(TYPE_OPTS)})">${row.type||''}</td>
+      <td class="ec" onclick="startEdit(event,${row.num},'source')">${row.source||''}</td>
+      <td class="ec" onclick="startEdit(event,${row.num},'count')">${row.count||1}</td>
+      <td class="ec" onclick="startEditSel(event,${row.num},'status',${JSON.stringify(STATUS_OPTS)})"><span class="sb ${statusClass(row.status)}">${row.status||''}</span></td>
+      <td>${mapLink}</td>
+      <td class="ec" onclick="startEdit(event,${row.num},'baladiya')">${row.baladiya||''}</td>
+      <td><button class="db" onclick="deleteRow(event,${row.num})">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function rowClick(num) {
+  highlightRow(num);
+  const row = DATA.find(r => r.num === num);
+  if (row && row.E && row.N) map.setView([row.N, row.E], 17);
+}
+
+function highlightRow(num) {
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('hl'));
+  const el = document.getElementById('row-' + num);
+  if (el) { el.classList.add('hl'); el.scrollIntoView({block:'nearest'}); }
+}
+
+function startEdit(e, num, field) {
+  e.stopPropagation();
+  const td = e.currentTarget;
+  const row = DATA.find(r => r.num === num);
+  if (!row) return;
+  const cur = row[field] != null ? row[field] : '';
+  td.innerHTML = `<input value="${String(cur).replace(/"/g,'&quot;')}" onblur="commitEdit(${num},'${field}',this)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  td.querySelector('input').focus();
+}
+
+function startEditSel(e, num, field, opts) {
+  e.stopPropagation();
+  const td = e.currentTarget;
+  const row = DATA.find(r => r.num === num);
+  if (!row) return;
+  const cur = row[field] || '';
+  const options = opts.map(o => `<option${o===cur?' selected':''}>${o}</option>`).join('');
+  td.innerHTML = `<select onchange="commitEdit(${num},'${field}',this)" onblur="renderTable()">${options}</select>`;
+  td.querySelector('select').focus();
+}
+
+function commitEdit(num, field, el) {
+  const row = DATA.find(r => r.num === num);
+  if (!row) return;
+  let val = el.value;
+  if (field === 'count') val = parseInt(val) || 1;
+  row[field] = val;
+  persist();
+  updateStats();
+  renderTable();
+  renderMarkers();
+}
+
+function deleteRow(e, num) {
+  e.stopPropagation();
+  if (!confirm('حذف هذا التعدي؟')) return;
+  DATA = DATA.filter(r => r.num !== num);
+  persist();
+  updateStats();
+  renderTable();
+  renderMarkers();
+}
+
+function addNewRow() {
+  const maxNum = DATA.reduce((m, r) => Math.max(m, r.num || 0), 0);
+  DATA.push({num: maxNum + 1, ref: 'رصد جديد', desc: '', date_obs: new Date().toISOString().slice(0,10),
+    E: null, N: null, neighborhood: '', street: '', type: 'امطار', count: 1, source: '', status: 'قائم', baladiya: ''});
+  persist();
+  updateStats();
+  renderTable();
+  setTimeout(() => {
+    const el = document.getElementById('row-' + (maxNum + 1));
+    if (el) el.scrollIntoView({block: 'center'});
+  }, 100);
+}
+
+function searchTable(q) {
+  searchQ = q;
+  statusFilter = null;
+  renderTable();
+}
+
+function filterByStatus(type) {
+  statusFilter = statusFilter === type ? null : type;
+  searchQ = '';
+  document.querySelector('.sb-box').value = '';
+  renderTable();
+}
+
+// ── IMAGES ────────────────────────────────────────────────────────────────────
+function openImgPicker(num) {
+  currentImageRow = num;
+  const fi = document.getElementById('fileInput');
+  fi.onchange = function() {
+    const file = fi.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      images[num] = ev.target.result;
+      persist();
+      map.closePopup();
+    };
+    reader.readAsDataURL(file);
+    fi.value = '';
+  };
+  fi.click();
+}
+
+function removeImg(num) {
+  delete images[num];
+  persist();
+  map.closePopup();
+}
+
+// ── EXCEL EXPORT ──────────────────────────────────────────────────────────────
+function saveAll() {
+  const headers = ['رقم','رقم المعاملة','وصف التعدي','تاريخ الرصد','خط الطول E','خط العرض N','الحي','الشارع','نوع الشبكة','مصدر التعدي','عدد مرات الرصد','الحالة','البلدية'];
+  const wsData = [headers, ...DATA.map(r => [r.num,r.ref,r.desc,r.date_obs,r.E,r.N,r.neighborhood,r.street,r.type,r.source,r.count,r.status,r.baladiya])];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = headers.map((_,i) => ({wch: [6,18,40,14,12,12,16,22,12,16,8,18,14][i]}));
+  XLSX.utils.book_append_sheet(wb, ws, 'التعديات');
+  XLSX.writeFile(wb, 'تعديات_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
+
+// ── EXCEL IMPORT ──────────────────────────────────────────────────────────────
+function handleXlsxImport(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type: 'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval: ''});
+      if (!rows.length) { setImportStatus('الملف فارغ', true); return; }
+
+      // Map Arabic headers to field names
+      const fieldMap = {
+        'رقم': 'num', 'رقم المعاملة': 'ref', 'وصف التعدي': 'desc',
+        'تاريخ الرصد': 'date_obs', 'خط الطول E': 'E', 'خط العرض N': 'N',
+        'الحي': 'neighborhood', 'الشارع': 'street', 'نوع الشبكة': 'type',
+        'مصدر التعدي': 'source', 'عدد مرات الرصد': 'count',
+        'الحالة': 'status', 'البلدية': 'baladiya',
+        // English fallbacks
+        'num':'num','ref':'ref','desc':'desc','date_obs':'date_obs',
+        'E':'E','N':'N','neighborhood':'neighborhood','street':'street',
+        'type':'type','source':'source','count':'count','status':'status','baladiya':'baladiya'
+      };
+
+      const parsed = rows.map((r, i) => {
+        const obj = {num: i+1, ref:'', desc:'', date_obs:'', E:null, N:null,
+          neighborhood:'', street:'', type:'امطار', source:'', count:1, status:'قائم', baladiya:''};
+        Object.entries(r).forEach(([k, v]) => {
+          const field = fieldMap[k.trim()];
+          if (field) obj[field] = v === '' ? (field==='E'||field==='N'?null:v) : v;
+        });
+        if (obj.E) obj.E = parseFloat(obj.E) || null;
+        if (obj.N) obj.N = parseFloat(obj.N) || null;
+        obj.count = parseInt(obj.count) || 1;
+        if (!obj.num) obj.num = i + 1;
+        return obj;
+      });
+
+      if (confirm(`تم قراءة ${parsed.length} سجل من الملف.\nهل تريد استبدال البيانات الحالية؟\n(اضغط إلغاء لإضافة فقط الجديد)`)) {
+        DATA = parsed;
+      } else {
+        const existingNums = new Set(DATA.map(r => String(r.ref) + r.date_obs));
+        const newRows = parsed.filter(r => !existingNums.has(String(r.ref) + r.date_obs));
+        const maxNum = DATA.reduce((m, r) => Math.max(m, r.num||0), 0);
+        newRows.forEach((r, i) => r.num = maxNum + i + 1);
+        DATA = [...DATA, ...newRows];
+        setImportStatus(`✓ تمت إضافة ${newRows.length} سجل جديد`);
+      }
+      persist();
+      updateStats();
+      renderTable();
+      renderMarkers();
+      document.getElementById('importModal').style.display = 'none';
+      input.value = '';
+    } catch(err) {
+      setImportStatus('خطأ في قراءة الملف: ' + err.message, true);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setImportStatus(msg, isErr) {
+  const el = document.getElementById('importStatus');
+  el.textContent = msg;
+  el.style.color = isErr ? '#EF4444' : '#14B8A6';
+}
+
+// ── DRAG & DROP on modal ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const fakeInput = {files: [file], value: ''};
+      handleXlsxImport(fakeInput);
+    }
+  });
+
+  initMap();
+  updateStats();
+  renderTable();
+});
+</script>
+</body>
+</html>
